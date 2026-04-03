@@ -1,0 +1,47 @@
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --map-parchment: #b89a6e;
+  --tile-explored-fill: rgba(92, 58, 32, 0.42);
+  --tile-explored-stroke: rgba(72, 44, 22, 0.35);
+  --status-bg: rgba(255, 255, 255, 0.82);
+  --status-text: #2c2416;
+  --status-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: var(--map-parchment);
+}
+
+.leaflet-container {
+  background: var(--map-parchment);
+}
+
+#status {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 6px 14px;
+  font-family: var(--status-font);
+  font-size: 14px;
+  color: var(--status-text);
+  background: var(--status-bg);
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
