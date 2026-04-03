@@ -34,6 +34,13 @@ body.mapwright-debug #map {
   background: var(--map-parchment);
 }
 
+.mapwright-exploration-mask {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+
 #status {
   position: fixed;
   top: max(8px, env(safe-area-inset-top));

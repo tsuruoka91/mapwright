@@ -12,19 +12,10 @@ const BRUSH_RADIUS_METERS = 20;
 /** 前スタンプからこの距離（m）以上動いたら新しい円を追加（重なり過ぎ防止） */
 const BRUSH_MIN_STEP_METERS = 10;
 
-/** 地図タイルを覆う外周（穴＝未踏破以外は parchment 色のみ） */
-const WORLD_MASK_OUTER = [
-  [-85, -200],
-  [-85, 200],
-  [85, 200],
-  [85, -200],
-];
-
-/** 踏破穴を円で近似する分割数（スタンプが多いときは 32 程度が無難） */
-const EXPLORATION_HOLE_SEGMENTS = 32;
-
 /** `?debug=1` … GPS なしで地図クリックによりスタンプ（連打で負荷が上がるので動作確認専用） */
 const DEBUG_MODE = new URLSearchParams(location.search).get("debug") === "1";
+
+const MASK_FILL = "#b89a6e";
 
 function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -39,23 +30,23 @@ function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
-function circleRingLatLngs(centerLat, centerLng, radiusMeters, segments) {
+/** 現在の縮尺で、緯度 lat における meters の距離が何 container ピクセルか（円半径用） */
+function metersToContainerPixels(map, lat, lng, meters) {
   const mPerLat = Geo.metersPerDegreeLatitude;
-  const latRad = (centerLat * Math.PI) / 180;
+  const latRad = (lat * Math.PI) / 180;
   const mPerLng = mPerLat * Math.cos(latRad);
-  const ring = [];
-  for (let i = 0; i < segments; i++) {
-    const angle = (2 * Math.PI * i) / segments;
-    const eastM = radiusMeters * Math.cos(angle);
-    const northM = radiusMeters * Math.sin(angle);
-    ring.push([centerLat + northM / mPerLat, centerLng + eastM / mPerLng]);
-  }
-  return ring;
+  const ll0 = L.latLng(lat, lng);
+  const ll1 = L.latLng(lat, lng + meters / mPerLng);
+  const p0 = map.latLngToContainerPoint(ll0);
+  const p1 = map.latLngToContainerPoint(ll1);
+  return Math.hypot(p1.x - p0.x, p1.y - p0.y);
 }
 
 let map;
 let userMarker;
-let explorationMaskPolygon = null;
+/** @type {HTMLCanvasElement | null} */
+let explorationMaskCanvas = null;
+let explorationMaskRedrawScheduled = false;
 /** @type {number[][]} 各要素は [lat, lng] */
 const strokeCenters = [];
 let lastStampLatLng = null;
@@ -128,24 +119,66 @@ function updateStatusDisplay() {
   }
 }
 
-function rebuildExplorationMask() {
-  if (explorationMaskPolygon) {
-    map.removeLayer(explorationMaskPolygon);
-    explorationMaskPolygon = null;
+function ensureExplorationMaskCanvas() {
+  if (explorationMaskCanvas) {
+    return;
   }
-  const holes = [];
-  strokeCenters.forEach(function (pair) {
-    holes.push(
-      circleRingLatLngs(pair[0], pair[1], BRUSH_RADIUS_METERS, EXPLORATION_HOLE_SEGMENTS)
-    );
+  explorationMaskCanvas = L.DomUtil.create("canvas", "mapwright-exploration-mask");
+  explorationMaskCanvas.style.pointerEvents = "none";
+  map.getPanes().overlayPane.appendChild(explorationMaskCanvas);
+  function schedule() {
+    scheduleExplorationMaskRedraw();
+  }
+  map.on("move moveend zoom zoomend resize viewreset", schedule);
+}
+
+function scheduleExplorationMaskRedraw() {
+  if (explorationMaskRedrawScheduled || !map || !explorationMaskCanvas) {
+    return;
+  }
+  explorationMaskRedrawScheduled = true;
+  L.Util.requestAnimFrame(function () {
+    explorationMaskRedrawScheduled = false;
+    redrawExplorationMaskCanvas();
   });
-  const latlngs = holes.length ? [WORLD_MASK_OUTER].concat(holes) : [WORLD_MASK_OUTER];
-  explorationMaskPolygon = L.polygon(latlngs, {
-    stroke: false,
-    fillColor: "#b89a6e",
-    fillOpacity: 1,
-    interactive: false,
-  }).addTo(map);
+}
+
+function redrawExplorationMaskCanvas() {
+  if (!map || !explorationMaskCanvas) {
+    return;
+  }
+  const size = map.getSize();
+  const canvas = explorationMaskCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(size.x * dpr));
+  canvas.height = Math.max(1, Math.floor(size.y * dpr));
+  canvas.style.width = size.x + "px";
+  canvas.style.height = size.y + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = MASK_FILL;
+  ctx.fillRect(0, 0, size.x, size.y);
+  ctx.globalCompositeOperation = "destination-out";
+  strokeCenters.forEach(function (pair) {
+    const lat = pair[0];
+    const lng = pair[1];
+    const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+    let r = metersToContainerPixels(map, lat, lng, BRUSH_RADIUS_METERS);
+    if (r < 1) {
+      r = 1;
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalCompositeOperation = "source-over";
+}
+
+function rebuildExplorationMask() {
+  ensureExplorationMaskCanvas();
+  scheduleExplorationMaskRedraw();
   userMarker.bringToFront();
 }
 
