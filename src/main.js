@@ -23,6 +23,9 @@ const WORLD_MASK_OUTER = [
 /** 踏破穴を円で近似する分割数（スタンプが多いときは 32 程度が無難） */
 const EXPLORATION_HOLE_SEGMENTS = 32;
 
+/** `?debug=1` … GPS なしで地図クリックによりスタンプ（連打で負荷が上がるので動作確認専用） */
+const DEBUG_MODE = new URLSearchParams(location.search).get("debug") === "1";
+
 function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
   const R = 6371000;
   const p1 = (lat1 * Math.PI) / 180;
@@ -75,6 +78,13 @@ function initMap() {
     fillColor: "#2d2d2d",
     fillOpacity: 0.95,
   }).addTo(map);
+  if (DEBUG_MODE) {
+    document.body.classList.add("mapwright-debug");
+    map.on("click", function (e) {
+      userMarker.setLatLng(e.latlng);
+      registerBrushStamp(e.latlng.lat, e.latlng.lng, { force: true });
+    });
+  }
 }
 
 function loadBrushStrokesFromStorage() {
@@ -110,7 +120,11 @@ function saveBrushStrokesToStorage() {
 function updateStatusDisplay() {
   const el = document.getElementById("status");
   if (el) {
-    el.textContent = "踏破ポイント: " + strokeCenters.length;
+    let t = "踏破ポイント: " + strokeCenters.length;
+    if (DEBUG_MODE) {
+      t += " [DEBUG]";
+    }
+    el.textContent = t;
   }
 }
 
@@ -171,8 +185,15 @@ function restoreExplorationFromStorage() {
   }
 }
 
-function tryRegisterBrushStamp(lat, lng) {
+/**
+ * @param {number} lat
+ * @param {number} lng
+ * @param {{ force?: boolean }} [options] force なら距離閾値を無視（デバッグ用クリック）
+ */
+function registerBrushStamp(lat, lng, options) {
+  const force = options && options.force === true;
   if (
+    !force &&
     lastStampLatLng !== null &&
     haversineDistanceMeters(lastStampLatLng.lat, lastStampLatLng.lng, lat, lng) <
       BRUSH_MIN_STEP_METERS
@@ -193,7 +214,7 @@ function onGeolocationSuccess(pos) {
   const ll = L.latLng(lat, lng);
   userMarker.setLatLng(ll);
   map.panTo(ll, { animate: false });
-  tryRegisterBrushStamp(lat, lng);
+  registerBrushStamp(lat, lng, { force: false });
 }
 
 function onGeolocationError(err) {
@@ -214,4 +235,6 @@ function startGeolocationWatch() {
 
 initMap();
 restoreExplorationFromStorage();
-startGeolocationWatch();
+if (!DEBUG_MODE) {
+  startGeolocationWatch();
+}

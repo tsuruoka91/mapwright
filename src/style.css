@@ -26,6 +26,10 @@ body {
   background: var(--map-parchment);
 }
 
+body.mapwright-debug #map {
+  cursor: crosshair;
+}
+
 .leaflet-container {
   background: var(--map-parchment);
 }
