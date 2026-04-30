@@ -34,11 +34,13 @@ body.mapwright-debug #map {
   background: var(--map-parchment);
 }
 
-.mapwright-exploration-mask {
+/* タイル・ベクタより上、マーカー（600）より下。map-pane の transform の外でビューポートと一致 */
+.leaflet-container canvas.mapwright-exploration-mask {
   position: absolute;
   left: 0;
   top: 0;
-  z-index: 1;
+  z-index: 550;
+  pointer-events: none;
 }
 
 #status {
@@ -55,4 +57,30 @@ body.mapwright-debug #map {
   border-radius: 6px;
   pointer-events: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+#reset-exploration {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 8px 16px;
+  font-family: var(--status-font);
+  font-size: 14px;
+  color: var(--status-text);
+  background: var(--status-bg);
+  border: 1px solid rgba(44, 36, 22, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+#reset-exploration:focus-visible {
+  outline: 2px solid #5c4a32;
+  outline-offset: 2px;
+}
+
+#reset-exploration:active {
+  opacity: 0.92;
 }

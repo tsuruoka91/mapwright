@@ -8,9 +8,9 @@ const Geo = {
 const STORAGE_KEY = "exploration_map_brush_stroke_v1";
 
 /** 筆の半径（m）。GPS 誤差と見た目のバランスで調整 */
-const BRUSH_RADIUS_METERS = 20;
+const BRUSH_RADIUS_METERS = 100;
 /** 前スタンプからこの距離（m）以上動いたら新しい円を追加（重なり過ぎ防止） */
-const BRUSH_MIN_STEP_METERS = 10;
+const BRUSH_MIN_STEP_METERS = 50;
 
 /** `?debug=1` … GPS なしで地図クリックによりスタンプ（連打で負荷が上がるので動作確認専用） */
 const DEBUG_MODE = new URLSearchParams(location.search).get("debug") === "1";
@@ -125,7 +125,9 @@ function ensureExplorationMaskCanvas() {
   }
   explorationMaskCanvas = L.DomUtil.create("canvas", "mapwright-exploration-mask");
   explorationMaskCanvas.style.pointerEvents = "none";
-  map.getPanes().overlayPane.appendChild(explorationMaskCanvas);
+  /* overlayPane は map-pane の transform に沿うため container 座標と不一致になる。
+     コンテナ直下に置き latLngToContainerPoint と同期させる */
+  map.getContainer().appendChild(explorationMaskCanvas);
   function schedule() {
     scheduleExplorationMaskRedraw();
   }
