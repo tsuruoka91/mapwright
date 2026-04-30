@@ -8,11 +8,11 @@ const Geo = {
 const STORAGE_KEY = "exploration_map_brush_stroke_v1";
 
 /** 筆の半径（m）。GPS 誤差と見た目のバランスで調整 */
-const BRUSH_RADIUS_METERS = 100;
+const BRUSH_RADIUS_METERS = 200;
 /** 前スタンプからこの距離（m）以上動いたら新しい円を追加（重なり過ぎ防止） */
-const BRUSH_MIN_STEP_METERS = 50;
+const BRUSH_MIN_STEP_METERS = 100;
 
-/** `?debug=1` … GPS なしで地図クリックによりスタンプ（連打で負荷が上がるので動作確認専用） */
+/** `?debug=1` … GPS ウォッチは使わず、初期位置のみ getCurrentPosition。スタンプは地図クリック（連打で負荷が上がるので動作確認専用） */
 const DEBUG_MODE = new URLSearchParams(location.search).get("debug") === "1";
 
 const MASK_FILL = "#b89a6e";
@@ -243,6 +243,15 @@ function registerBrushStamp(lat, lng, options) {
   return true;
 }
 
+/** 地図とマーカーを GPS に合わせる（デバッグ時の初期位置用。スタンプは付けない） */
+function applyGpsInitialView(pos) {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const ll = L.latLng(lat, lng);
+  userMarker.setLatLng(ll);
+  map.panTo(ll, { animate: false });
+}
+
 function onGeolocationSuccess(pos) {
   const lat = pos.coords.latitude;
   const lng = pos.coords.longitude;
@@ -268,8 +277,23 @@ function startGeolocationWatch() {
   });
 }
 
+/** デバッグモード: ウォッチは使わず、初期表示だけ GPS で合わせる */
+function fetchInitialGpsForDebug() {
+  if (!navigator.geolocation) {
+    console.warn("Geolocation is not supported");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(applyGpsInitialView, onGeolocationError, {
+    enableHighAccuracy: true,
+    maximumAge: 5000,
+    timeout: 15000,
+  });
+}
+
 initMap();
 restoreExplorationFromStorage();
-if (!DEBUG_MODE) {
+if (DEBUG_MODE) {
+  fetchInitialGpsForDebug();
+} else {
   startGeolocationWatch();
 }
